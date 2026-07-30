@@ -1,0 +1,2 @@
+# Only needed for speedtest_upload.py (test_proxy.py is stdlib-only)
+oci>=2.100.0

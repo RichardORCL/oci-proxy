@@ -1,0 +1,32 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+packages:
+  - squid
+
+write_files:
+  - path: /etc/squid/conf.d/proxy.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # Managed by OCI Resource Manager stack
+      http_port ${proxy_port}
+
+      acl allowed_clients src ${proxy_allowed_cidr}
+      http_access allow allowed_clients
+      http_access deny all
+
+      # Reasonable defaults
+      cache deny all
+      via off
+      forwarded_for delete
+
+runcmd:
+  # Default listener is defined in squid.conf; disable it so only our port is used.
+  - sed -i 's/^http_port 3128$/# http_port 3128 (disabled, see conf.d\/proxy.conf)/' /etc/squid/squid.conf
+  # Oracle Ubuntu images only allow SSH in iptables; open the proxy port and persist.
+  - iptables -I INPUT -p tcp --dport ${proxy_port} -m state --state NEW -j ACCEPT
+  - netfilter-persistent save
+  - systemctl enable squid
+  - systemctl restart squid

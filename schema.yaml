@@ -1,0 +1,227 @@
+title: "Ubuntu Proxy Server"
+description: "Provisions an Ubuntu compute instance with a preconfigured Squid proxy server, deployed into an existing VCN/subnet of your choice."
+schemaVersion: 1.1.0
+version: "1.0"
+locale: "en"
+
+variableGroups:
+  - title: "Placement"
+    variables:
+      - instance_compartment_ocid
+      - availability_domain
+
+  - title: "Network"
+    variables:
+      - network_compartment_ocid
+      - vcn_id
+      - subnet_id
+      - assign_public_ip
+
+  - title: "Instance Configuration"
+    variables:
+      - instance_display_name
+      - instance_shape
+      - instance_ocpus
+      - instance_memory_in_gbs
+      - boot_volume_size_in_gbs
+      - ubuntu_version
+      - ssh_public_key
+
+  - title: "Proxy Configuration"
+    variables:
+      - proxy_port
+      - proxy_allowed_cidr
+
+  - title: "Hidden"
+    visible: false
+    variables:
+      - tenancy_ocid
+      - region
+      - compartment_ocid
+
+variables:
+  # -------------------------------------------------------------------------
+  # Placement
+  # -------------------------------------------------------------------------
+  instance_compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Compartment"
+    description: "Compartment in which the proxy instance will be created."
+    required: true
+    default: ${compartment_ocid}
+
+  availability_domain:
+    type: oci:identity:availabilitydomain:name
+    title: "Availability Domain"
+    description: "Availability domain for the proxy instance."
+    required: true
+    dependsOn:
+      compartmentId: ${instance_compartment_ocid}
+
+  # -------------------------------------------------------------------------
+  # Network
+  # -------------------------------------------------------------------------
+  network_compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Network Compartment"
+    description: "Compartment that contains the VCN and subnet."
+    required: true
+    default: ${compartment_ocid}
+
+  vcn_id:
+    type: oci:core:vcn:id
+    title: "Virtual Cloud Network (VCN)"
+    description: "Existing VCN to deploy the proxy into."
+    required: true
+    dependsOn:
+      compartmentId: ${network_compartment_ocid}
+
+  subnet_id:
+    type: oci:core:subnet:id
+    title: "Subnet"
+    description: "Existing subnet for the proxy instance. Choose a public subnet if you want a public IP."
+    required: true
+    dependsOn:
+      compartmentId: ${network_compartment_ocid}
+      vcnId: ${vcn_id}
+      hidePrivateSubnet: ${assign_public_ip}
+
+  assign_public_ip:
+    type: boolean
+    title: "Assign Public IP"
+    description: "Assign a public IP address to the proxy instance (requires a public subnet)."
+    default: true
+
+  # -------------------------------------------------------------------------
+  # Instance configuration
+  # -------------------------------------------------------------------------
+  instance_display_name:
+    type: string
+    title: "Instance Name"
+    description: "Display name for the proxy instance."
+    required: true
+    default: "proxy-server"
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$"
+
+  instance_shape:
+    type: oci:core:instanceshape:name
+    title: "Compute Shape"
+    description: "Shape of the proxy instance."
+    required: true
+    default: "VM.Standard.E4.Flex"
+    dependsOn:
+      compartmentId: ${instance_compartment_ocid}
+
+  instance_ocpus:
+    type: integer
+    title: "OCPUs"
+    description: "Number of OCPUs (flexible shapes only)."
+    minimum: 1
+    maximum: 64
+    default: 1
+    required: true
+    visible:
+      or:
+        - eq: [instance_shape, "VM.Standard.E3.Flex"]
+        - eq: [instance_shape, "VM.Standard.E4.Flex"]
+        - eq: [instance_shape, "VM.Standard.E5.Flex"]
+        - eq: [instance_shape, "VM.Standard.A1.Flex"]
+        - eq: [instance_shape, "VM.Standard.A2.Flex"]
+        - eq: [instance_shape, "VM.Standard3.Flex"]
+        - eq: [instance_shape, "VM.Optimized3.Flex"]
+
+  instance_memory_in_gbs:
+    type: integer
+    title: "Memory (GB)"
+    description: "Amount of memory in GB (flexible shapes only)."
+    minimum: 1
+    maximum: 1024
+    default: 8
+    required: true
+    visible:
+      or:
+        - eq: [instance_shape, "VM.Standard.E3.Flex"]
+        - eq: [instance_shape, "VM.Standard.E4.Flex"]
+        - eq: [instance_shape, "VM.Standard.E5.Flex"]
+        - eq: [instance_shape, "VM.Standard.A1.Flex"]
+        - eq: [instance_shape, "VM.Standard.A2.Flex"]
+        - eq: [instance_shape, "VM.Standard3.Flex"]
+        - eq: [instance_shape, "VM.Optimized3.Flex"]
+
+  boot_volume_size_in_gbs:
+    type: integer
+    title: "Boot Volume Size (GB)"
+    description: "Size of the boot volume in GB."
+    minimum: 50
+    maximum: 32768
+    default: 50
+    required: true
+
+  ubuntu_version:
+    type: enum
+    title: "Ubuntu Version"
+    description: "Ubuntu release to install."
+    default: "24.04"
+    required: true
+    enum:
+      - "24.04"
+      - "22.04"
+
+  ssh_public_key:
+    type: oci:core:ssh:publickey
+    title: "SSH Public Key"
+    description: "Public key for SSH access to the instance (user: ubuntu)."
+    required: true
+
+  # -------------------------------------------------------------------------
+  # Proxy configuration
+  # -------------------------------------------------------------------------
+  proxy_port:
+    type: integer
+    title: "Proxy Port"
+    description: "TCP port the Squid proxy listens on."
+    minimum: 1024
+    maximum: 65535
+    default: 3128
+    required: true
+
+  proxy_allowed_cidr:
+    type: string
+    title: "Allowed Client CIDR"
+    description: "CIDR block allowed to connect to the proxy (e.g. your VCN CIDR). Also used for the network security group ingress rule."
+    default: "10.0.0.0/16"
+    required: true
+    pattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}\\/([0-9]|[1-2][0-9]|3[0-2])$"
+
+outputGroups:
+  - title: "Proxy Endpoints"
+    outputs:
+      - proxy_url_private
+      - proxy_url_public
+
+  - title: "Instance Details"
+    outputs:
+      - instance_id
+      - private_ip
+      - public_ip
+      - image_used
+
+outputs:
+  proxy_url_private:
+    type: copyableString
+    title: "Proxy URL (private)"
+  proxy_url_public:
+    type: copyableString
+    title: "Proxy URL (public)"
+  instance_id:
+    type: ocid
+    title: "Instance OCID"
+  private_ip:
+    type: copyableString
+    title: "Private IP"
+  public_ip:
+    type: copyableString
+    title: "Public IP"
+  image_used:
+    type: string
+    title: "Ubuntu Image"
