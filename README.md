@@ -3,6 +3,17 @@
 This stack provisions an **Ubuntu compute instance with a preconfigured Squid
 proxy server** into an existing VCN/subnet, using OCI Resource Manager (ORM).
 
+## Deploy to Oracle Cloud
+
+Sign in to your OCI tenancy and click the button below to create the stack
+directly from this repository:
+
+[![Deploy to Oracle Cloud](images/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/RichardORCL/oci-proxy/archive/refs/heads/main.zip)
+
+After logging in you land on the Resource Manager "Create stack" page with
+this repository preloaded; just fill in the variables, then run **Plan** and
+**Apply**.
+
 ## What gets created
 
 | Resource | Purpose |
