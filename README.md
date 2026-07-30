@@ -1,6 +1,6 @@
-# Ubuntu Proxy Server – OCI Resource Manager Stack
+# Ubuntu Proxy Server for OCI 
 
-This stack provisions an **Ubuntu compute instance with a preconfigured Squid
+This OCI Resource Management stack provisions an **Ubuntu compute instance with a preconfigured Squid
 proxy server** into an existing VCN/subnet, using OCI Resource Manager (ORM).
 
 ## Deploy to Oracle Cloud
@@ -53,16 +53,30 @@ curl -x http://<proxy-ip>:3128 https://example.com
 
 ## Deploying as a Resource Manager stack
 
-1. Zip the contents of this folder (files at the zip root, not in a subfolder):
+There are two ways to deploy this stack:
 
-   ```powershell
-   Compress-Archive -Path *.tf, *.tftpl, schema.yaml -DestinationPath ocm-proxy-stack.zip -Force
-   ```
+### Option 1: Deploy to Oracle Cloud button (easiest)
 
+Click the **Deploy to Oracle Cloud** button at the top of this page. After
+signing in to your tenancy, the Resource Manager "Create stack" page opens
+with this repository preloaded. Fill in the form (compartment, VCN/subnet,
+shape, SSH key, proxy settings), then run **Plan** and **Apply**.
+
+### Option 2: Manual zip upload
+
+1. Download [`ocm-proxy-stack.zip`](https://github.com/RichardORCL/oci-proxy/raw/main/ocm-proxy-stack.zip)
+   from this repository (it contains only the Terraform files, cloud-init
+   template, and schema).
 2. In the OCI Console: **Developer Services → Resource Manager → Stacks →
    Create stack**, choose **My configuration → .Zip file** and upload the zip.
 3. Fill in the form (compartment, VCN/subnet, shape, SSH key, proxy settings).
 4. Run **Plan**, review, then **Apply**.
+
+If you modify the Terraform files, rebuild the zip with:
+
+```powershell
+Compress-Archive -Path *.tf, cloud-init.yaml.tftpl, schema.yaml -DestinationPath ocm-proxy-stack.zip -Force
+```
 
 ## Notes
 
