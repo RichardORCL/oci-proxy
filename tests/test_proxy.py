@@ -12,7 +12,10 @@ Runs a series of checks against the proxy and prints a pass/fail report:
 Uses only the Python standard library.
 
 Usage:
-    python test_proxy.py --host <proxy-ip> [--port 3128] [--timeout 10]
+    python test_proxy.py --proxy <proxy-ip>[:port] [--timeout 10]
+
+The proxy may be given as '10.0.0.5', '10.0.0.5:3128' or
+'http://10.0.0.5:3128' (port defaults to 3128).
 
 Exit code is 0 if all checks pass, 1 otherwise.
 """
@@ -24,7 +27,20 @@ import ssl
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+
+
+def parse_proxy(value, default_port=3128):
+    """Normalize '<host>', '<host>:<port>' or 'http://<host>:<port>' to
+    (host, port, url). Shared convention with speedtest_upload.py."""
+    if "//" not in value:
+        value = "http://" + value
+    parsed = urllib.parse.urlparse(value)
+    if not parsed.hostname:
+        raise ValueError(f"invalid proxy: {value!r}")
+    port = parsed.port or default_port
+    return parsed.hostname, port, f"http://{parsed.hostname}:{port}"
 
 HTTP_TEST_URL = "http://neverssl.com/"
 HTTPS_TEST_URL = "https://example.com/"
@@ -39,9 +55,8 @@ def report(name, ok, detail=""):
     print(f"  [{status}] {name}" + (f" - {detail}" if detail else ""))
 
 
-def make_opener(proxy_host, proxy_port):
-    proxy = f"http://{proxy_host}:{proxy_port}"
-    handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+def make_opener(proxy_url):
+    handler = urllib.request.ProxyHandler({"http": proxy_url, "https": proxy_url})
     return urllib.request.build_opener(handler)
 
 
@@ -113,21 +128,27 @@ def check_anonymity(opener, timeout):
 
 def main():
     parser = argparse.ArgumentParser(description="Validate the ocm-proxy Squid server.")
-    parser.add_argument("--host", required=True, help="Proxy IP address or hostname")
-    parser.add_argument("--port", type=int, default=3128, help="Proxy port (default: 3128)")
+    parser.add_argument("--proxy", required=True,
+                        help="Proxy IP/hostname, e.g. 10.0.0.5, 10.0.0.5:3128 "
+                             "or http://10.0.0.5:3128 (port defaults to 3128)")
     parser.add_argument("--timeout", type=float, default=10.0,
                         help="Per-request timeout in seconds (default: 10)")
     args = parser.parse_args()
 
-    print(f"Testing proxy http://{args.host}:{args.port}\n")
+    try:
+        host, port, proxy_url = parse_proxy(args.proxy)
+    except ValueError as exc:
+        parser.error(str(exc))
 
-    if not check_tcp_connect(args.host, args.port, args.timeout):
+    print(f"Testing proxy {proxy_url}\n")
+
+    if not check_tcp_connect(host, port, args.timeout):
         print("\nProxy port unreachable - skipping remaining checks.")
         print("Hints: NSG/security list ingress rule, instance iptables, "
               "cloud-init still running, or wrong IP.")
         sys.exit(1)
 
-    opener = make_opener(args.host, args.port)
+    opener = make_opener(proxy_url)
     check_http(opener, args.timeout)
     check_https(opener, args.timeout)
     check_anonymity(opener, args.timeout)

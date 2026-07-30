@@ -24,6 +24,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 
 try:
     import oci
@@ -32,6 +33,18 @@ except ImportError:
 
 MiB = 1024 * 1024
 GiB = 1024 * MiB
+
+
+def parse_proxy(value, default_port=3128):
+    """Normalize '<host>', '<host>:<port>' or 'http://<host>:<port>' to a
+    proxy URL. Shared convention with test_proxy.py."""
+    if "//" not in value:
+        value = "http://" + value
+    parsed = urllib.parse.urlparse(value)
+    if not parsed.hostname:
+        raise ValueError(f"invalid proxy: {value!r}")
+    port = parsed.port or default_port
+    return f"http://{parsed.hostname}:{port}"
 
 
 def human_rate(bytes_per_sec):
@@ -103,7 +116,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Upload speedtest to OCI Object Storage via the proxy.")
     parser.add_argument("--proxy", required=True,
-                        help="Proxy URL, e.g. http://10.0.1.23:3128")
+                        help="Proxy IP/hostname, e.g. 10.0.1.23, 10.0.1.23:3128 "
+                             "or http://10.0.1.23:3128 (port defaults to 3128)")
     parser.add_argument("--bucket", required=True, help="Target bucket name")
     parser.add_argument("--namespace", default=None,
                         help="Object Storage namespace (auto-detected if omitted)")
@@ -128,6 +142,11 @@ def main():
     parser.add_argument("--keep-file", action="store_true",
                         help="Do not delete the generated local dummy file afterwards")
     args = parser.parse_args()
+
+    try:
+        args.proxy = parse_proxy(args.proxy)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     size_bytes = int(args.size_gb * GiB)
     part_size = args.part_size_mb * MiB

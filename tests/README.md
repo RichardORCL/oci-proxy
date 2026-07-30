@@ -11,8 +11,11 @@ Two scripts for validating a proxy instance deployed by this stack:
 ## Usage
 
 ```bash
-python test_proxy.py --host <proxy-ip> [--port 3128] [--timeout 10]
+python test_proxy.py --proxy <proxy-ip>[:port] [--timeout 10]
 ```
+
+Both test scripts accept the proxy as `10.0.0.5`, `10.0.0.5:3128` or
+`http://10.0.0.5:3128` (the port defaults to 3128).
 
 Use the private IP when running from inside the VCN, or the public IP from
 outside (only works if your source IP is within the stack's

@@ -78,6 +78,46 @@ If you modify the Terraform files, rebuild the zip with:
 Compress-Archive -Path *.tf, cloud-init.yaml.tftpl, schema.yaml -DestinationPath ocm-proxy-stack.zip -Force
 ```
 
+## Testing the proxy
+
+The [`tests`](tests/) folder contains two Python scripts to validate a
+deployed proxy. Both take the proxy address via `--proxy`, given as
+`10.0.0.5`, `10.0.0.5:3128` or `http://10.0.0.5:3128` (port defaults
+to 3128). Run them from a machine inside the stack's "Allowed Client CIDR".
+
+### test_proxy.py – functional validation
+
+Checks that the proxy works correctly. Uses only the Python standard
+library, so nothing needs to be installed:
+
+```bash
+python tests/test_proxy.py --proxy <proxy-ip>
+```
+
+It verifies that the proxy port is reachable (NSG, security lists and
+instance firewall), that plain HTTP requests are forwarded, that HTTPS
+tunneling (CONNECT) works, and that no `Via` / `X-Forwarded-For` headers
+leak to the origin server. Exit code 0 means all checks passed.
+
+### speedtest_upload.py – throughput test
+
+Measures upload bandwidth through the proxy by uploading a dummy file
+(default 4 GiB) to an OCI Object Storage bucket as a multipart upload with
+parallel streams (default 5). Requires the OCI Python SDK
+(`pip install -r tests/requirements.txt`) and credentials with write access
+to the bucket:
+
+```bash
+python tests/speedtest_upload.py --proxy <proxy-ip> --bucket <bucket-name>
+```
+
+It prints live progress and a final report with duration and average
+throughput (MiB/s and Mbit/s), then cleans up the uploaded object and the
+local dummy file. File size, stream count, part size and authentication
+method (API key or instance principal) are configurable; see `--help`.
+
+Full documentation for both scripts is in [`tests/README.md`](tests/README.md).
+
 ## Notes
 
 - If the subnet uses security lists that block the proxy port, allow it there
